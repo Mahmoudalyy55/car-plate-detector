@@ -5,12 +5,13 @@ import cv2
 import numpy as np
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QPushButton, QTableWidget, QTableWidgetItem,
-                            QHeaderView, QMessageBox, QGroupBox, QSplitter)
+                            QHeaderView, QMessageBox, QGroupBox, QSplitter,
+                            QFrame)
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap, QFont, QColor
 
 from model.plate_detector import PlateDetector
-from database.db_handler import DatabaseHandler
+from database.init_db import DatabaseHandler
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -19,6 +20,59 @@ class MainWindow(QMainWindow):
         # Window properties
         self.setWindowTitle("License Plate Recognition System")
         self.setMinimumSize(1200, 800)
+        
+        # Set application style
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f0f0f0;
+            }
+            QGroupBox {
+                font-size: 14px;
+                font-weight: bold;
+                border: 2px solid #2196F3;
+                border-radius: 6px;
+                margin-top: 12px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 13px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:disabled {
+                background-color: #BDBDBD;
+            }
+            QTableWidget {
+                border: 1px solid #E0E0E0;
+                border-radius: 4px;
+                background-color: white;
+                gridline-color: #E0E0E0;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+            QHeaderView::section {
+                background-color: #2196F3;
+                color: white;
+                padding: 5px;
+                border: none;
+            }
+            QLabel {
+                font-size: 13px;
+            }
+        """)
         
         # Initialize components
         self.plate_detector = PlateDetector()
@@ -40,31 +94,50 @@ class MainWindow(QMainWindow):
         
         # Create main layout
         main_layout = QHBoxLayout(central_widget)
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
         
         # Left panel - Camera feed and detection
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
+        left_layout.setSpacing(15)
         
-        # Camera view
+        # Camera view with border
+        camera_frame = QFrame()
+        camera_frame.setFrameStyle(QFrame.StyledPanel)
+        camera_frame.setStyleSheet("""
+            QFrame {
+                border: 2px solid #2196F3;
+                border-radius: 6px;
+                background-color: black;
+            }
+        """)
+        camera_layout = QVBoxLayout(camera_frame)
+        
         self.camera_label = QLabel()
         self.camera_label.setAlignment(Qt.AlignCenter)
         self.camera_label.setMinimumSize(640, 480)
-        self.camera_label.setStyleSheet("background-color: black;")
-        left_layout.addWidget(self.camera_label)
+        camera_layout.addWidget(self.camera_label)
+        
+        left_layout.addWidget(camera_frame)
         
         # Control buttons
         control_layout = QHBoxLayout()
+        control_layout.setSpacing(10)
         
         self.start_button = QPushButton("Start Camera")
+        self.start_button.setIcon(self.style().standardIcon(self.style().SP_MediaPlay))
         self.start_button.clicked.connect(self.start_camera)
         control_layout.addWidget(self.start_button)
         
         self.stop_button = QPushButton("Stop Camera")
+        self.stop_button.setIcon(self.style().standardIcon(self.style().SP_MediaStop))
         self.stop_button.clicked.connect(self.stop_camera)
         self.stop_button.setEnabled(False)
         control_layout.addWidget(self.stop_button)
         
         self.detect_button = QPushButton("Detect Plate")
+        self.detect_button.setIcon(self.style().standardIcon(self.style().SP_CommandLink))
         self.detect_button.clicked.connect(self.detect_plate)
         self.detect_button.setEnabled(False)
         control_layout.addWidget(self.detect_button)
@@ -74,8 +147,19 @@ class MainWindow(QMainWindow):
         # Detection results
         detection_group = QGroupBox("Detection Results")
         detection_layout = QVBoxLayout(detection_group)
+        detection_layout.setSpacing(10)
         
         self.plate_label = QLabel("Plate Number: None")
+        self.plate_label.setStyleSheet("""
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+                color: #2196F3;
+                padding: 10px;
+                background-color: white;
+                border-radius: 4px;
+            }
+        """)
         detection_layout.addWidget(self.plate_label)
         
         left_layout.addWidget(detection_group)
@@ -83,6 +167,7 @@ class MainWindow(QMainWindow):
         # Right panel - Car and driver information
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
+        right_layout.setSpacing(15)
         
         # Car information
         car_group = QGroupBox("Car Information")
@@ -91,6 +176,12 @@ class MainWindow(QMainWindow):
         self.car_table = QTableWidget(0, 2)
         self.car_table.setHorizontalHeaderLabels(["Property", "Value"])
         self.car_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.car_table.setAlternatingRowColors(True)
+        self.car_table.setStyleSheet("""
+            QTableWidget {
+                alternate-background-color: #E3F2FD;
+            }
+        """)
         car_layout.addWidget(self.car_table)
         
         right_layout.addWidget(car_group)
@@ -102,6 +193,12 @@ class MainWindow(QMainWindow):
         self.driver_table = QTableWidget(0, 2)
         self.driver_table.setHorizontalHeaderLabels(["Property", "Value"])
         self.driver_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.driver_table.setAlternatingRowColors(True)
+        self.driver_table.setStyleSheet("""
+            QTableWidget {
+                alternate-background-color: #E3F2FD;
+            }
+        """)
         driver_layout.addWidget(self.driver_table)
         
         right_layout.addWidget(driver_group)
@@ -111,6 +208,12 @@ class MainWindow(QMainWindow):
         splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
         splitter.setSizes([600, 600])
+        splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #2196F3;
+                width: 2px;
+            }
+        """)
         
         main_layout.addWidget(splitter)
     
