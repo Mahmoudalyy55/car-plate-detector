@@ -50,8 +50,18 @@ python main.py
 
 The application uses an SQLite database with the following structure:
 
-- `vehicles` table: Contains vehicle information (plate number, make, model, etc.)
-- `owners` table: Contains owner information (name, license, contact details)
+- `allowed_cars` table: Contains vehicle and owner information
+  - plate_number (TEXT, PRIMARY KEY)
+  - owner_name (TEXT, NOT NULL)
+  - national_id (TEXT, NOT NULL)
+  - phone_number (TEXT, NOT NULL)
+  - car_model (TEXT)
+  - car_color (TEXT)
+
+- `detected_cars` table: Records detected license plates
+  - id (INTEGER, PRIMARY KEY AUTOINCREMENT)
+  - plate_number (TEXT, NOT NULL)
+  - timestamp (TEXT, NOT NULL)
 
 A sample database is automatically created if none exists.
 

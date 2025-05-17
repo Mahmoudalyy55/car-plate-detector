@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                             QFrame)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap, QFont, QColor
+import sqlite3
 
 from model.plate_detector import PlateDetector
 from database.init_db import DatabaseHandler
@@ -273,16 +274,29 @@ class MainWindow(QMainWindow):
                     # Query the database for the plate
                     if plate_text != "None":
                         try:
+                            # Add detected car to history
+                            self.db_handler.add_detected_car(plate_text)
+                            
+                            # Get car and driver info
                             car_info, driver_info = self.db_handler.get_info_by_plate(plate_text)
                             if car_info and driver_info:
                                 self.update_car_info(car_info)
                                 self.update_driver_info(driver_info)
                             else:
                                 self.plate_label.setText(f"Plate {plate_text} not found in database")
-                        except Exception as e:
-                            QMessageBox.warning(self, "Database Error", f"Error querying database: {str(e)}")
+                                # Clear tables if no data found
+                                self.car_table.setRowCount(0)
+                                self.driver_table.setRowCount(0)
+                        except sqlite3.Error as e:
+                            QMessageBox.warning(self, "Database Error", f"Error accessing database: {str(e)}")
+                            self.plate_label.setText("Database Error")
+                            self.car_table.setRowCount(0)
+                            self.driver_table.setRowCount(0)
                 except Exception as e:
                     QMessageBox.warning(self, "Detection Error", f"Error detecting plate: {str(e)}")
+                    self.plate_label.setText("Detection Error")
+                    self.car_table.setRowCount(0)
+                    self.driver_table.setRowCount(0)
     
     def update_car_info(self, car_info):
         """Update the car information table."""
@@ -302,4 +316,10 @@ class MainWindow(QMainWindow):
             for i, (key, value) in enumerate(driver_info.items()):
                 self.driver_table.insertRow(i)
                 self.driver_table.setItem(i, 0, QTableWidgetItem(key))
-                self.driver_table.setItem(i, 1, QTableWidgetItem(str(value))) 
+                self.driver_table.setItem(i, 1, QTableWidgetItem(str(value)))
+    
+    def __del__(self):
+        """Clean up resources when the window is closed."""
+        self.stop_camera()
+        if hasattr(self, 'db_handler'):
+            del self.db_handler 
