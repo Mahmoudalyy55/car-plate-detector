@@ -219,14 +219,17 @@ class MainWindow(QMainWindow):
     
     def start_camera(self):
         """Start the camera capture and timer."""
-        self.cap = cv2.VideoCapture(self.camera_index)
-        if self.cap.isOpened():
-            self.timer.start(30)  # Update every 30ms (approx. 33 fps)
-            self.start_button.setEnabled(False)
-            self.stop_button.setEnabled(True)
-            self.detect_button.setEnabled(True)
-        else:
-            QMessageBox.warning(self, "Camera Error", "Failed to open camera.")
+        try:
+            self.cap = cv2.VideoCapture(self.camera_index)
+            if self.cap.isOpened():
+                self.timer.start(30)  # Update every 30ms (approx. 33 fps)
+                self.start_button.setEnabled(False)
+                self.stop_button.setEnabled(True)
+                self.detect_button.setEnabled(True)
+            else:
+                QMessageBox.warning(self, "Camera Error", "Failed to open camera. Please check if it's in use by another application.")
+        except Exception as e:
+            QMessageBox.critical(self, "Camera Error", f"Error starting camera: {str(e)}")
     
     def stop_camera(self):
         """Stop the camera capture and timer."""
@@ -259,15 +262,24 @@ class MainWindow(QMainWindow):
         if self.cap is not None and self.cap.isOpened():
             ret, frame = self.cap.read()
             if ret:
-                # Use the plate detector model
-                plate_text = self.plate_detector.detect_and_recognize(frame)
-                self.plate_label.setText(f"Plate Number: {plate_text}")
-                
-                # Query the database for the plate
-                if plate_text != "None":
-                    car_info, driver_info = self.db_handler.get_info_by_plate(plate_text)
-                    self.update_car_info(car_info)
-                    self.update_driver_info(driver_info)
+                try:
+                    # Use the plate detector model
+                    plate_text = self.plate_detector.detect_and_recognize(frame)
+                    self.plate_label.setText(f"Plate Number: {plate_text}")
+                    
+                    # Query the database for the plate
+                    if plate_text != "None":
+                        try:
+                            car_info, driver_info = self.db_handler.get_info_by_plate(plate_text)
+                            if car_info and driver_info:
+                                self.update_car_info(car_info)
+                                self.update_driver_info(driver_info)
+                            else:
+                                self.plate_label.setText(f"Plate {plate_text} not found in database")
+                        except Exception as e:
+                            QMessageBox.warning(self, "Database Error", f"Error querying database: {str(e)}")
+                except Exception as e:
+                    QMessageBox.warning(self, "Detection Error", f"Error detecting plate: {str(e)}")
     
     def update_car_info(self, car_info):
         """Update the car information table."""
