@@ -9,6 +9,7 @@ A PyQt5 desktop application that uses computer vision to detect license plates, 
 - OCR for extracting letters and numbers from license plates
 - SQLite database integration for vehicle and driver information lookup
 - User-friendly interface for displaying results
+- Plate management system for adding, editing, and deleting plates
 
 ## Installation
 
@@ -37,13 +38,25 @@ python main.py
 1. Click "Start Camera" to begin the camera feed
 2. When a license plate is visible, click "Detect Plate"
 3. The system will detect the plate, extract its text, and display vehicle and driver information if found in the database
+4. Use the "Manage Plates" button to add, edit, or delete plates in the database
 
 ## Project Structure
 
 - `main.py`: Application entry point
-- `ui/main_window.py`: Main UI implementation
-- `model/plate_detector.py`: License plate detection and OCR logic
-- `database/db_handler.py`: Database operations
+- `config.py`: Configuration settings
+- `ui/`
+  - `main_window.py`: Main UI implementation
+  - `plate_manager.py`: Plate management dialog
+- `model/`
+  - `plate_detector.py`: License plate detection and OCR logic
+  - `models/`: Pre-trained models
+    - `plate_detector.xml`: License plate detection model
+    - `ocr_model.pb`: OCR model
+    - `test_images/`: Test images for development
+      - `sample_plates/`: Sample license plate images
+      - `test_cases/`: Test cases for validation
+- `database/`
+  - `init_db.py`: Database operations
 - `requirements.txt`: Required dependencies
 
 ## Database

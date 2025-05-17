@@ -4,20 +4,18 @@
 import cv2
 import numpy as np
 import os
+import sys
+
+# Add parent directory to path to import config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import PLATE_DETECTOR_PATH, OCR_MODEL_PATH
 
 class PlateDetector:
     def __init__(self):
         """Initialize the license plate detector with pre-trained models."""
-        # Define paths to models (these would be your actual model paths)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Placeholder paths for the pre-trained models
-        self.plate_cascade_path = os.path.join(current_dir, "models", "plate_detector.xml")
-        self.ocr_model_path = os.path.join(current_dir, "models", "ocr_model.pb")
-        
-        # Load license plate detector cascade (using OpenCV's cascade as placeholder)
+        # Load license plate detector cascade
         try:
-            self.plate_cascade = cv2.CascadeClassifier(self.plate_cascade_path)
+            self.plate_cascade = cv2.CascadeClassifier(PLATE_DETECTOR_PATH)
             # If your pre-trained model is not a cascade, replace with appropriate model loading
             print("License plate detector loaded successfully.")
         except Exception as e:

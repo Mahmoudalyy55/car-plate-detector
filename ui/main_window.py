@@ -3,6 +3,13 @@
 
 import cv2
 import numpy as np
+import os
+import sys
+
+# Add parent directory to path to import config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import UI_SETTINGS, CAMERA_INDEX, CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_FPS
+
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QPushButton, QTableWidget, QTableWidgetItem,
                             QHeaderView, QMessageBox, QGroupBox, QSplitter,
@@ -13,14 +20,15 @@ import sqlite3
 
 from model.plate_detector import PlateDetector
 from database.init_db import DatabaseHandler
+from ui.plate_manager import PlateManagerDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
         # Window properties
-        self.setWindowTitle("License Plate Recognition System")
-        self.setMinimumSize(1200, 800)
+        self.setWindowTitle(UI_SETTINGS["window_title"])
+        self.setMinimumSize(*UI_SETTINGS["window_size"])
         
         # Set application style
         self.setStyleSheet("""
@@ -83,7 +91,7 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         
         # Initialize camera
-        self.camera_index = 0
+        self.camera_index = CAMERA_INDEX
         self.cap = None
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
@@ -117,7 +125,7 @@ class MainWindow(QMainWindow):
         
         self.camera_label = QLabel()
         self.camera_label.setAlignment(Qt.AlignCenter)
-        self.camera_label.setMinimumSize(640, 480)
+        self.camera_label.setMinimumSize(*UI_SETTINGS["camera_size"])
         camera_layout.addWidget(self.camera_label)
         
         left_layout.addWidget(camera_frame)
@@ -142,6 +150,11 @@ class MainWindow(QMainWindow):
         self.detect_button.clicked.connect(self.detect_plate)
         self.detect_button.setEnabled(False)
         control_layout.addWidget(self.detect_button)
+        
+        self.manage_button = QPushButton("Manage Plates")
+        self.manage_button.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
+        self.manage_button.clicked.connect(self.show_plate_manager)
+        control_layout.addWidget(self.manage_button)
         
         left_layout.addLayout(control_layout)
         
@@ -223,7 +236,12 @@ class MainWindow(QMainWindow):
         try:
             self.cap = cv2.VideoCapture(self.camera_index)
             if self.cap.isOpened():
-                self.timer.start(30)  # Update every 30ms (approx. 33 fps)
+                # Set camera properties
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+                self.cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+                
+                self.timer.start(UI_SETTINGS["refresh_rate"])
                 self.start_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
                 self.detect_button.setEnabled(True)
@@ -317,6 +335,11 @@ class MainWindow(QMainWindow):
                 self.driver_table.insertRow(i)
                 self.driver_table.setItem(i, 0, QTableWidgetItem(key))
                 self.driver_table.setItem(i, 1, QTableWidgetItem(str(value)))
+    
+    def show_plate_manager(self):
+        """Show the plate management dialog."""
+        dialog = PlateManagerDialog(self.db_handler, self)
+        dialog.exec_()
     
     def __del__(self):
         """Clean up resources when the window is closed."""

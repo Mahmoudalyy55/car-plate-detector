@@ -1,7 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import sqlite3
 from datetime import datetime
+import os
+import sys
 
-DB_NAME = "cars.db"
+# Add parent directory to path to import config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DB_PATH, DB_SETTINGS
 
 class DatabaseHandler:
     def __init__(self):
@@ -10,29 +17,19 @@ class DatabaseHandler:
     def setup_database(self):
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
-            # Allowed cars table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS allowed_cars (
-                    plate_number TEXT PRIMARY KEY,
-                    owner_name TEXT NOT NULL,
-                    national_id TEXT NOT NULL,
-                    phone_number TEXT NOT NULL,
-                    car_model TEXT,
-                    car_color TEXT
-                )
-            ''')
-
-            # Detected cars table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS detected_cars (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    plate_number TEXT NOT NULL,
-                    timestamp TEXT NOT NULL
-                )
-            ''')
+            # Create tables based on config
+            for table_name, table_info in DB_SETTINGS.items():
+                columns = [f"{col_name} {col_type}" 
+                          for col_name, col_type in table_info["columns"].items()]
+                create_table_sql = f'''
+                    CREATE TABLE IF NOT EXISTS {table_info["table_name"]} (
+                        {", ".join(columns)}
+                    )
+                '''
+                cursor.execute(create_table_sql)
 
             conn.commit()
         except sqlite3.Error as e:
@@ -49,7 +46,7 @@ class DatabaseHandler:
             
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             
             # Get car and driver info
@@ -92,7 +89,7 @@ class DatabaseHandler:
             
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO allowed_cars (plate_number, owner_name, national_id, phone_number, car_model, car_color)
@@ -116,7 +113,7 @@ class DatabaseHandler:
             
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('DELETE FROM allowed_cars WHERE plate_number = ?', (plate_number,))
             conn.commit()
@@ -134,7 +131,7 @@ class DatabaseHandler:
     def get_all_allowed_cars(self):
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM allowed_cars')
             return cursor.fetchall()
@@ -151,7 +148,7 @@ class DatabaseHandler:
             
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute('INSERT INTO detected_cars (plate_number, timestamp) VALUES (?, ?)', 
@@ -167,7 +164,7 @@ class DatabaseHandler:
     def get_all_detected_cars(self):
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('SELECT plate_number, timestamp FROM detected_cars ORDER BY timestamp DESC')
             return cursor.fetchall()
@@ -181,7 +178,7 @@ class DatabaseHandler:
     def get_last_10_detected_cars(self):
         conn = None
         try:
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('SELECT plate_number, timestamp FROM detected_cars ORDER BY timestamp DESC LIMIT 10')
             return cursor.fetchall()
