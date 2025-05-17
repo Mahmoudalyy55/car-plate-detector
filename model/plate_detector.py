@@ -22,8 +22,10 @@ class PlateDetector:
             print("License plate detector loaded successfully.")
         except Exception as e:
             print(f"Warning: Could not load license plate detector: {e}")
-            # Fallback to OpenCV's default cascade as a placeholder
-            self.plate_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            # Fallback to a more appropriate cascade for license plates
+            self.plate_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_russian_plate_number.xml')
+            if self.plate_cascade.empty():
+                print("Warning: Could not load fallback cascade. Plate detection may not work properly.")
         
         # Load OCR model (placeholder - replace with actual model loading)
         try:

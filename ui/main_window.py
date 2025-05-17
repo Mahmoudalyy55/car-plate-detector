@@ -245,17 +245,20 @@ class MainWindow(QMainWindow):
         """Update the camera frame in the UI."""
         if self.cap is not None and self.cap.isOpened():
             ret, frame = self.cap.read()
-            if ret:
-                # Convert to RGB for display (OpenCV uses BGR)
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                
-                # Convert to QImage and display
-                h, w, ch = rgb_frame.shape
-                bytes_per_line = ch * w
-                q_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                self.camera_label.setPixmap(QPixmap.fromImage(q_image).scaled(
-                    self.camera_label.width(), self.camera_label.height(), 
-                    Qt.KeepAspectRatio))
+            if ret and frame is not None and frame.size > 0:
+                try:
+                    # Convert to RGB for display (OpenCV uses BGR)
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Convert to QImage and display
+                    h, w, ch = rgb_frame.shape
+                    bytes_per_line = ch * w
+                    q_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                    self.camera_label.setPixmap(QPixmap.fromImage(q_image).scaled(
+                        self.camera_label.width(), self.camera_label.height(), 
+                        Qt.KeepAspectRatio))
+                except Exception as e:
+                    print(f"Error updating frame: {str(e)}")
     
     def detect_plate(self):
         """Detect the license plate in the current frame."""
