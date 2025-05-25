@@ -136,20 +136,8 @@ class MainWindow(QMainWindow):
         
         self.start_button = QPushButton("Start Camera")
         self.start_button.setIcon(self.style().standardIcon(self.style().SP_MediaPlay))
-        self.start_button.clicked.connect(self.start_camera)
+        self.start_button.clicked.connect(self.toggle_camera)
         control_layout.addWidget(self.start_button)
-        
-        self.stop_button = QPushButton("Stop Camera")
-        self.stop_button.setIcon(self.style().standardIcon(self.style().SP_MediaStop))
-        self.stop_button.clicked.connect(self.stop_camera)
-        self.stop_button.setEnabled(False)
-        control_layout.addWidget(self.stop_button)
-        
-        self.detect_button = QPushButton("Detect Plate")
-        self.detect_button.setIcon(self.style().standardIcon(self.style().SP_CommandLink))
-        self.detect_button.clicked.connect(self.detect_plate)
-        self.detect_button.setEnabled(False)
-        control_layout.addWidget(self.detect_button)
         
         self.manage_button = QPushButton("Manage Plates")
         self.manage_button.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
@@ -231,43 +219,75 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(splitter)
     
-    def start_camera(self):
-        """Start the camera capture and timer."""
-        try:
-            self.cap = cv2.VideoCapture(self.camera_index)
-            if self.cap.isOpened():
-                # Set camera properties
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-                self.cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
-                
-                self.timer.start(UI_SETTINGS["refresh_rate"])
-                self.start_button.setEnabled(False)
-                self.stop_button.setEnabled(True)
-                self.detect_button.setEnabled(True)
-            else:
-                QMessageBox.warning(self, "Camera Error", "Failed to open camera. Please check if it's in use by another application.")
-        except Exception as e:
-            QMessageBox.critical(self, "Camera Error", f"Error starting camera: {str(e)}")
-    
-    def stop_camera(self):
-        """Stop the camera capture and timer."""
-        self.timer.stop()
-        if self.cap is not None:
+    def toggle_camera(self):
+        """Toggle the camera on/off."""
+        if self.cap is None or not self.cap.isOpened():
+            try:
+                self.cap = cv2.VideoCapture(self.camera_index)
+                if self.cap.isOpened():
+                    # Set camera properties
+                    self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+                    self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+                    self.cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+                    
+                    self.timer.start(UI_SETTINGS["refresh_rate"])
+                    self.start_button.setText("Stop Camera")
+                    self.start_button.setIcon(self.style().standardIcon(self.style().SP_MediaStop))
+                else:
+                    QMessageBox.warning(self, "Camera Error", "Failed to open camera. Please check if it's in use by another application.")
+            except Exception as e:
+                QMessageBox.critical(self, "Camera Error", f"Error starting camera: {str(e)}")
+        else:
+            self.timer.stop()
             self.cap.release()
             self.cap = None
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
-        self.detect_button.setEnabled(False)
+            self.start_button.setText("Start Camera")
+            self.start_button.setIcon(self.style().standardIcon(self.style().SP_MediaPlay))
+            # Clear the camera view
+            self.camera_label.clear()
+            # Reset plate detection display
+            self.plate_label.setText("Plate Number: None")
+            self.car_table.setRowCount(0)
+            self.driver_table.setRowCount(0)
     
     def update_frame(self):
-        """Update the camera frame in the UI."""
+        """Update the camera frame in the UI and perform automatic plate detection."""
         if self.cap is not None and self.cap.isOpened():
             ret, frame = self.cap.read()
             if ret and frame is not None and frame.size > 0:
                 try:
                     # Convert to RGB for display (OpenCV uses BGR)
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Perform automatic plate detection
+                    try:
+                        # Use the plate detector model
+                        plate_text = self.plate_detector.detect_and_recognize(frame)
+                        self.plate_label.setText(f"Plate Number: {plate_text}")
+                        
+                        # Query the database for the plate
+                        if plate_text != "None":
+                            try:
+                                # Add detected car to history
+                                self.db_handler.add_detected_car(plate_text)
+                                
+                                # Get car and driver info
+                                car_info, driver_info = self.db_handler.get_info_by_plate(plate_text)
+                                if car_info and driver_info:
+                                    self.update_car_info(car_info)
+                                    self.update_driver_info(driver_info)
+                                else:
+                                    self.plate_label.setText(f"Plate {plate_text} not found in database")
+                                    # Clear tables if no data found
+                                    self.car_table.setRowCount(0)
+                                    self.driver_table.setRowCount(0)
+                            except sqlite3.Error as e:
+                                QMessageBox.warning(self, "Database Error", f"Error accessing database: {str(e)}")
+                                self.plate_label.setText("Database Error")
+                                self.car_table.setRowCount(0)
+                                self.driver_table.setRowCount(0)
+                    except Exception as e:
+                        print(f"Error detecting plate: {str(e)}")
                     
                     # Convert to QImage and display
                     h, w, ch = rgb_frame.shape
@@ -278,43 +298,6 @@ class MainWindow(QMainWindow):
                         Qt.KeepAspectRatio))
                 except Exception as e:
                     print(f"Error updating frame: {str(e)}")
-    
-    def detect_plate(self):
-        """Detect the license plate in the current frame."""
-        if self.cap is not None and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret:
-                try:
-                    # Use the plate detector model
-                    plate_text = self.plate_detector.detect_and_recognize(frame)
-                    self.plate_label.setText(f"Plate Number: {plate_text}")
-                    
-                    # Query the database for the plate
-                    if plate_text != "None":
-                        try:
-                            # Add detected car to history
-                            self.db_handler.add_detected_car(plate_text)
-                            
-                            # Get car and driver info
-                            car_info, driver_info = self.db_handler.get_info_by_plate(plate_text)
-                            if car_info and driver_info:
-                                self.update_car_info(car_info)
-                                self.update_driver_info(driver_info)
-                            else:
-                                self.plate_label.setText(f"Plate {plate_text} not found in database")
-                                # Clear tables if no data found
-                                self.car_table.setRowCount(0)
-                                self.driver_table.setRowCount(0)
-                        except sqlite3.Error as e:
-                            QMessageBox.warning(self, "Database Error", f"Error accessing database: {str(e)}")
-                            self.plate_label.setText("Database Error")
-                            self.car_table.setRowCount(0)
-                            self.driver_table.setRowCount(0)
-                except Exception as e:
-                    QMessageBox.warning(self, "Detection Error", f"Error detecting plate: {str(e)}")
-                    self.plate_label.setText("Detection Error")
-                    self.car_table.setRowCount(0)
-                    self.driver_table.setRowCount(0)
     
     def update_car_info(self, car_info):
         """Update the car information table."""
@@ -343,6 +326,8 @@ class MainWindow(QMainWindow):
     
     def __del__(self):
         """Clean up resources when the window is closed."""
-        self.stop_camera()
+        self.timer.stop()
+        self.cap.release()
+        self.cap = None
         if hasattr(self, 'db_handler'):
             del self.db_handler 
