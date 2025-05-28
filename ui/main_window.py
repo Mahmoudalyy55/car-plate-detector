@@ -13,7 +13,7 @@ from config import UI_SETTINGS, CAMERA_INDEX, CAMERA_WIDTH, CAMERA_HEIGHT, CAMER
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QPushButton, QTableWidget, QTableWidgetItem,
                             QHeaderView, QMessageBox, QGroupBox, QSplitter,
-                            QFrame)
+                            QFrame, QFileDialog)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap, QFont, QColor
 import sqlite3
@@ -96,6 +96,10 @@ class MainWindow(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
         
+        # Initialize video playback
+        self.video_file = None
+        self.is_video = False
+        
     def setup_ui(self):
         # Create central widget
         central_widget = QWidget()
@@ -134,11 +138,39 @@ class MainWindow(QMainWindow):
         control_layout = QHBoxLayout()
         control_layout.setSpacing(10)
         
+        # Camera controls
         self.start_button = QPushButton("Start Camera")
         self.start_button.setIcon(self.style().standardIcon(self.style().SP_MediaPlay))
         self.start_button.clicked.connect(self.toggle_camera)
         control_layout.addWidget(self.start_button)
         
+<<<<<<< Updated upstream
+=======
+        self.stop_button = QPushButton("Stop Camera")
+        self.stop_button.setIcon(self.style().standardIcon(self.style().SP_MediaStop))
+        self.stop_button.clicked.connect(self.stop_camera)
+        self.stop_button.setEnabled(False)
+        control_layout.addWidget(self.stop_button)
+        
+        # File controls
+        self.upload_image_button = QPushButton("Upload Image")
+        self.upload_image_button.setIcon(self.style().standardIcon(self.style().SP_FileIcon))
+        self.upload_image_button.clicked.connect(self.upload_image)
+        control_layout.addWidget(self.upload_image_button)
+        
+        self.upload_video_button = QPushButton("Upload Video")
+        self.upload_video_button.setIcon(self.style().standardIcon(self.style().SP_FileIcon))
+        self.upload_video_button.clicked.connect(self.upload_video)
+        control_layout.addWidget(self.upload_video_button)
+        
+        # Detection controls
+        self.detect_button = QPushButton("Detect Plate")
+        self.detect_button.setIcon(self.style().standardIcon(self.style().SP_CommandLink))
+        self.detect_button.clicked.connect(self.detect_plate)
+        self.detect_button.setEnabled(False)
+        control_layout.addWidget(self.detect_button)
+        
+>>>>>>> Stashed changes
         self.manage_button = QPushButton("Manage Plates")
         self.manage_button.setIcon(self.style().standardIcon(self.style().SP_FileDialogDetailedView))
         self.manage_button.clicked.connect(self.show_plate_manager)
@@ -218,7 +250,77 @@ class MainWindow(QMainWindow):
         """)
         
         main_layout.addWidget(splitter)
+
+    def upload_image(self):
+        """Handle image file upload."""
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Image",
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"
+        )
+        
+        if file_name:
+            # Stop camera if running
+            if self.cap is not None:
+                self.stop_camera()
+            
+            # Read and display image
+            frame = cv2.imread(file_name)
+            if frame is not None:
+                self.display_frame(frame)
+                self.detect_button.setEnabled(True)
+                self.is_video = False
+            else:
+                QMessageBox.warning(self, "Error", "Failed to load image file.")
+
+    def upload_video(self):
+        """Handle video file upload."""
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Video",
+            "",
+            "Video Files (*.mp4 *.avi *.mov *.mkv)"
+        )
+        
+        if file_name:
+            # Stop camera if running
+            if self.cap is not None:
+                self.stop_camera()
+            
+            # Open video file
+            self.cap = cv2.VideoCapture(file_name)
+            if self.cap.isOpened():
+                self.video_file = file_name
+                self.is_video = True
+                self.timer.start(UI_SETTINGS["refresh_rate"])
+                self.start_button.setEnabled(False)
+                self.stop_button.setEnabled(True)
+                self.detect_button.setEnabled(True)
+            else:
+                QMessageBox.warning(self, "Error", "Failed to load video file.")
+
+    def display_frame(self, frame):
+        """Display frame in the UI."""
+        # Convert frame to RGB
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Convert to QImage
+        h, w, ch = rgb_frame.shape
+        bytes_per_line = ch * w
+        qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        
+        # Scale image to fit label while maintaining aspect ratio
+        scaled_pixmap = QPixmap.fromImage(qt_image).scaled(
+            self.camera_label.size(),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+        
+        # Display image
+        self.camera_label.setPixmap(scaled_pixmap)
     
+<<<<<<< Updated upstream
     def toggle_camera(self):
         """Toggle the camera on/off."""
         if self.cap is None or not self.cap.isOpened():
@@ -299,35 +401,140 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     print(f"Error updating frame: {str(e)}")
     
+=======
+    def start_camera(self):
+        """Start the camera capture and timer."""
+        try:
+            self.cap = cv2.VideoCapture(self.camera_index)
+            if self.cap.isOpened():
+                # Set camera properties
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+                self.cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+                
+                self.timer.start(UI_SETTINGS["refresh_rate"])
+                self.start_button.setEnabled(False)
+                self.stop_button.setEnabled(True)
+                self.detect_button.setEnabled(True)
+                self.is_video = False
+            else:
+                QMessageBox.warning(self, "Camera Error", "Failed to open camera. Please check if it's in use by another application.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to start camera: {str(e)}")
+
+    def stop_camera(self):
+        """Stop the camera capture and timer."""
+        if self.cap is not None:
+            self.timer.stop()
+            self.cap.release()
+            self.cap = None
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
+            self.detect_button.setEnabled(False)
+            self.camera_label.clear()
+            self.video_file = None
+            self.is_video = False
+
+    def update_frame(self):
+        """Update the camera feed."""
+        if self.cap is not None and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if ret:
+                self.display_frame(frame)
+            else:
+                if self.is_video:
+                    # Video ended, restart from beginning
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                else:
+                    self.stop_camera()
+
+    def detect_plate(self):
+        """Detect license plates in the current frame."""
+        if self.camera_label.pixmap() is not None:
+            # Get current frame from camera or video
+            if self.cap is not None and self.cap.isOpened():
+                ret, frame = self.cap.read()
+                if not ret:
+                    return
+            else:
+                # Get frame from displayed image
+                pixmap = self.camera_label.pixmap()
+                image = pixmap.toImage()
+                width = image.width()
+                height = image.height()
+                ptr = image.bits()
+                ptr.setsize(height * width * 4)
+                arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 4))
+                frame = cv2.cvtColor(arr, cv2.COLOR_RGBA2BGR)
+            
+            try:
+                # Detect plates
+                detected_plates = self.plate_detector.detect_and_recognize(frame)
+                
+                if detected_plates:
+                    # Update display with detection results
+                    self.display_frame(frame)
+                    
+                    # Update plate label with first detected plate
+                    plate = detected_plates[0]
+                    self.plate_label.setText(f"Plate Number: {plate['text']}")
+                    
+                    # Look up vehicle information
+                    car_info, driver_info = self.db_handler.get_info_by_plate(plate['text'])
+                    if car_info and driver_info:
+                        self.update_car_info(car_info)
+                        self.update_driver_info(driver_info)
+                    else:
+                        self.car_table.setRowCount(0)
+                        self.driver_table.setRowCount(0)
+                else:
+                    self.plate_label.setText("No plates detected")
+                    self.car_table.setRowCount(0)
+                    self.driver_table.setRowCount(0)
+                    
+            except Exception as e:
+                QMessageBox.warning(self, "Detection Error", f"Error detecting plate: {str(e)}")
+
+>>>>>>> Stashed changes
     def update_car_info(self, car_info):
-        """Update the car information table."""
+        """Update car information table."""
         self.car_table.setRowCount(0)
-        
         if car_info:
-            for i, (key, value) in enumerate(car_info.items()):
-                self.car_table.insertRow(i)
-                self.car_table.setItem(i, 0, QTableWidgetItem(key))
-                self.car_table.setItem(i, 1, QTableWidgetItem(str(value)))
-    
+            self.car_table.setRowCount(2)
+            self.car_table.setItem(0, 0, QTableWidgetItem("Model"))
+            self.car_table.setItem(0, 1, QTableWidgetItem(car_info.get('Model', '')))
+            self.car_table.setItem(1, 0, QTableWidgetItem("Color"))
+            self.car_table.setItem(1, 1, QTableWidgetItem(car_info.get('Color', '')))
+
     def update_driver_info(self, driver_info):
-        """Update the driver information table."""
+        """Update driver information table."""
         self.driver_table.setRowCount(0)
-        
         if driver_info:
-            for i, (key, value) in enumerate(driver_info.items()):
-                self.driver_table.insertRow(i)
-                self.driver_table.setItem(i, 0, QTableWidgetItem(key))
-                self.driver_table.setItem(i, 1, QTableWidgetItem(str(value)))
-    
+            self.driver_table.setRowCount(4)
+            self.driver_table.setItem(0, 0, QTableWidgetItem("Name"))
+            self.driver_table.setItem(0, 1, QTableWidgetItem(driver_info.get('Owner Name', '')))
+            self.driver_table.setItem(1, 0, QTableWidgetItem("National ID"))
+            self.driver_table.setItem(1, 1, QTableWidgetItem(driver_info.get('National ID', '')))
+            self.driver_table.setItem(2, 0, QTableWidgetItem("Phone"))
+            self.driver_table.setItem(2, 1, QTableWidgetItem(driver_info.get('Phone Number', '')))
+            self.driver_table.setItem(3, 0, QTableWidgetItem("Plate Number"))
+            self.driver_table.setItem(3, 1, QTableWidgetItem(driver_info.get('Plate Number', '')))
+
     def show_plate_manager(self):
         """Show the plate management dialog."""
         dialog = PlateManagerDialog(self.db_handler, self)
         dialog.exec_()
-    
+
     def __del__(self):
+<<<<<<< Updated upstream
         """Clean up resources when the window is closed."""
         self.timer.stop()
         self.cap.release()
         self.cap = None
         if hasattr(self, 'db_handler'):
             del self.db_handler 
+=======
+        """Clean up resources."""
+        if self.cap is not None:
+            self.cap.release() 
+>>>>>>> Stashed changes
